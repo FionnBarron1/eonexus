@@ -302,6 +302,104 @@ h2 {
     color: #666;
 }
 
+/* ─── Member Spotlight ──────────────────────── */
+
+.member-spotlight {
+    background: #ffffff;
+    text-align: center;
+}
+
+.spotlight-label {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 2.5px;
+    text-transform: uppercase;
+    color: #30AB8E;
+    margin-bottom: 16px;
+}
+
+.spotlight-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 28px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+    .spotlight-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.spotlight-card {
+    background: #f4f5f6;
+    border-radius: 16px;
+    border-left: 4px solid #30AB8E;
+    padding: 40px 44px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+}
+
+.spotlight-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.spotlight-photo {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex-shrink: 0;
+    border: 2px solid #30AB8E;
+}
+
+.spotlight-name {
+    display: block;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #1a1a1a;
+}
+
+.spotlight-role {
+    font-size: 0.9rem;
+    color: #30AB8E;
+    font-weight: 500;
+}
+
+.spotlight-bio {
+    font-size: 1.05rem;
+    color: #444;
+    line-height: 1.75;
+    margin-bottom: 28px;
+    flex: 1;
+}
+
+.btn-podcast {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: #1a1a1a;
+    color: white;
+    text-decoration: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.btn-podcast:hover {
+    background: #30AB8E;
+    transform: translateY(-1px);
+}
+
 /* ─── Benefit Cards ─────────────────────────── */
 
 .benefits-grid {
