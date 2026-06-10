@@ -46,24 +46,27 @@
                     </div>
 
                     <hr class="form-divider">
-                    <div id="successMessage" class="success-message">
+                    <div id="successMessage" class="success-message" role="status">
                         Application received. We'll review it and be in touch within 48 hours.
                     </div>
+                    <div id="errorMessage" class="error-message" role="alert">
+                        Something went wrong submitting your application. Please try again in a moment.
+                    </div>
 
-                    <form id="interestForm">
+                    <form id="interestForm" method="post">
                         <div class="form-group">
                             <label for="name">Your Name</label>
-                            <input type="text" id="name" name="name" placeholder="First and last name" required>
+                            <input type="text" id="name" name="name" placeholder="First and last name" pattern=".*\S.*" title="Please enter your name" maxlength="100" required>
                         </div>
 
                         <div class="form-group">
                             <label for="email">Email Address</label>
-                            <input type="email" id="email" name="email" placeholder="you@yourcompany.com" required>
+                            <input type="email" id="email" name="email" placeholder="you@yourcompany.com" maxlength="254" required>
                         </div>
 
                         <div class="form-group">
                             <label for="company">Company Name</label>
-                            <input type="text" id="company" name="company" placeholder="Your business name" required>
+                            <input type="text" id="company" name="company" placeholder="Your business name" maxlength="150" required>
                         </div>
 
                         <div class="form-group">
@@ -80,9 +83,15 @@
 
                         <div class="form-group">
                             <label for="industry">Industry</label>
-                            <input type="text" id="industry" name="industry" placeholder="e.g., Food Manufacturing, SaaS, Services" required>
+                            <input type="text" id="industry" name="industry" placeholder="e.g., Food Manufacturing, SaaS, Services" maxlength="100" required>
                         </div>
 
+                        <div class="hp-field" aria-hidden="true">
+                            <label for="website">Website</label>
+                            <input type="text" id="website" name="website" tabindex="-1" autocomplete="off">
+                        </div>
+
+                        <p class="form-disclaimer">By clicking submit below, you consent to allow EO Ireland to store and process the personal information submitted above to provide you the content requested.</p>
                         <button type="submit" class="btn-primary">Apply for Your Spot &rarr;</button>
                         <p class="form-disclaimer">No commitment required. We'll reach out to discuss fit.</p>
                     </form>
@@ -406,30 +415,113 @@
             initStars();
             tick();
         })();
+    </script>
+    <script>
+        // Form handling lives in its own script block so a failure in the
+        // decorative canvas code above can never prevent the submit handler
+        // from attaching (which would fall back to a native GET submit,
+        // leaking applicant details into the URL).
+
+        // HubSpot Forms Submission API — EO Ireland portal / EO Nexus application form
+        const HUBSPOT_SUBMIT_URL = 'https://api.hsforms.com/submissions/v3/integration/submit/8966910/0c940532-366f-4289-98aa-5cc454201603';
+        const HUBSPOT_CONTACT = '0-1'; // objectTypeId for contact properties
 
         document.getElementById('interestForm').addEventListener('submit', function(e) {
             e.preventDefault();
 
             const form = this;
+            const submitBtn = form.querySelector('button[type="submit"]');
+            const successMessage = document.getElementById('successMessage');
+            const errorMessage = document.getElementById('errorMessage');
 
-            // Explicitly capture all field values before any reset
-            const payload = new URLSearchParams({
-                name:     form.querySelector('[name="name"]').value,
-                email:    form.querySelector('[name="email"]').value,
-                company:  form.querySelector('[name="company"]').value,
-                revenue:  form.querySelector('[name="revenue"]').value,
-                industry: form.querySelector('[name="industry"]').value
+            // Honeypot: real users never see this field; silently drop bot fills
+            if (form.querySelector('[name="website"]').value) {
+                successMessage.classList.add('show');
+                form.reset();
+                return;
+            }
+
+            const fullName = form.querySelector('[name="name"]').value.trim();
+            const nameParts = fullName.split(/\s+/);
+            const firstname = nameParts[0] || '';
+            // HubSpot form requires a last name; '-' marks "not provided"
+            const lastname = nameParts.slice(1).join(' ') || '-';
+
+            const revenueSelect = form.querySelector('[name="revenue"]');
+            const revenueLabel = revenueSelect.selectedOptions[0] ? revenueSelect.selectedOptions[0].text : '';
+
+            // Membership tier on the HubSpot form is inferred from the revenue band.
+            // Values must byte-match the form's dropdown options — including the
+            // unbalanced paren in the Accelerator option, which is exactly how the
+            // option is defined in the live HubSpot form (verified 2026-06-10).
+            const ACCELERATOR_BANDS = ['250k-500k', '500k-750k', '750k-1m'];
+            const membershipType =
+                revenueSelect.value === 'over-1m'               ? 'EO Membership (Revenue: €1m+)' :
+                ACCELERATOR_BANDS.includes(revenueSelect.value) ? 'Accelerator Member (Revenue (€250k-€1m)' :
+                                                                  'Other Query';
+
+            // The HubSpot form has no company/industry/revenue fields, so they go
+            // into the required "Tell us about yourself" message field
+            const message =
+                'Company: ' + form.querySelector('[name="company"]').value + '\n' +
+                'Industry: ' + form.querySelector('[name="industry"]').value + '\n' +
+                'Annual Revenue: ' + revenueLabel;
+
+            const payload = {
+                fields: [
+                    { objectTypeId: HUBSPOT_CONTACT, name: 'firstname', value: firstname },
+                    { objectTypeId: HUBSPOT_CONTACT, name: 'lastname', value: lastname },
+                    { objectTypeId: HUBSPOT_CONTACT, name: 'email', value: form.querySelector('[name="email"]').value },
+                    { objectTypeId: HUBSPOT_CONTACT, name: 'message', value: message },
+                    { objectTypeId: HUBSPOT_CONTACT, name: 'membership_type', value: membershipType }
+                ],
+                context: {
+                    pageUri: window.location.href,
+                    pageName: document.title
+                },
+                legalConsentOptions: {
+                    consent: {
+                        consentToProcess: true,
+                        text: 'By clicking submit below, you consent to allow EO Ireland to store and process the personal information submitted above to provide you the content requested.'
+                    }
+                }
+            };
+
+            const hutk = document.cookie.match(/(?:^|;\s*)hubspotutk=([^;]+)/);
+            if (hutk) payload.context.hutk = hutk[1];
+
+            successMessage.classList.remove('show');
+            errorMessage.classList.remove('show');
+            submitBtn.disabled = true;
+            const originalBtnHtml = submitBtn.innerHTML;
+            submitBtn.textContent = 'Submitting…';
+
+            fetch(HUBSPOT_SUBMIT_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+                keepalive: true,
+                signal: (typeof AbortSignal !== 'undefined' && AbortSignal.timeout) ? AbortSignal.timeout(15000) : undefined
+            }).then(function(res) {
+                if (!res.ok) {
+                    const httpError = new Error('HubSpot submission failed: HTTP ' + res.status);
+                    httpError.isValidation = res.status >= 400 && res.status < 500;
+                    throw httpError;
+                }
+                if (typeof gtag === 'function') gtag('event', 'generate_lead', { form: 'eo_nexus_application' });
+                successMessage.classList.add('show');
+                form.reset();
+            }).catch(function(err) {
+                console.error('Application form submission failed', err);
+                errorMessage.textContent = (err && err.isValidation)
+                    ? 'There was a problem with your submission — please check your details and try again.'
+                    : 'Something went wrong submitting your application. Please try again in a moment.';
+                if (typeof gtag === 'function') gtag('event', 'form_submit_error', { form: 'eo_nexus_application', error: String((err && err.message) || err) });
+                errorMessage.classList.add('show');
+            }).finally(function() {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnHtml;
             });
-
-            // Send data in background
-            fetch("https://script.google.com/macros/s/AKfycbzRDS-T9kE5uAwz7fj_XmFc9R9fgwTdM7nwCqtqgIvEFOs3jNVZlJSsEtFuts1oqIKc/exec", {
-                method: "POST",
-                body: payload
-            }).catch(function() {});
-
-            // Show success immediately
-            document.getElementById('successMessage').classList.add('show');
-            form.reset();
         });
     </script>
 </body>
